@@ -1,0 +1,83 @@
+---
+title: "download_metadata"
+author: "brunj7"
+date: "6/12/2020"
+output: html_document
+---
+---
+title: "Get data with the metdata using metajam"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Get data with the metdata using metajam}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup, warning=FALSE, message=FALSE}
+library(palmerpenguins)
+library(tidyverse)
+library(metajam) # devtools::install_github('NCEAS/metajam', build_vignettes = TRUE)
+```
+
+## Directly download the data from the EDI data repository
+
+
+Using the [`metjam`](https://nceas.github.io/metajam/index.html) package, you can not only cached the data, but also the metadata associated to them. 
+
+Here some of the perks of metajam, it will:
+
+- Check if you are trying to access the latest version
+- Check if you already have downloaded the data (e.g. you only download data once)
+- Download EML metadata and parse it into tables (allowing you to access information such as descriptions and units)
+- Load data and metadata into R
+
+
+```{r}
+# devtools::install_github('NCEAS/metajam', build_vignettes = TRUE)
+library(metajam) 
+
+# Download the data and metadata while checking if the URL you have is the latest and if you already downloaded this version of the data
+download_list <- map(uris, ~download_d1_data(.x, path =  "."))
+
+# Read the data and metadata into R
+penguin_datasets <- map(download_list, read_d1_files) %>% 
+  set_names(c("adelie", "gentoo", "chinstrap")) # adding names since the filenames are not explicit
+
+# Can check the metadata for information such as units to make sure you are combining the same information when concatenating the data frames
+penguin_datasets$adelie$attribute_metadata
+
+```
+
+```{r}
+# Combining the data
+penguins_metajam <- penguin_datasets %>% 
+  map_dfr(~.x$data, .id = "provenance") # ideally we will use the DOI (see example below)
+
+penguins_metajam
+                      
+```
+
+Note that with metajam you could also use the DOIs directly using the `download_d1_data_pkg()` function. A DOI points to a data package that can contains several data sets. In this example, there is only one data set per data package.
+
+```{r}
+dois <- c("https://doi.org/10.6073/pasta/abc50eed9138b75f54eaada0841b9b86", "https://doi.org/10.6073/pasta/2b1cff60f81640f182433d23e68541ce", "https://doi.org/10.6073/pasta/409c808f8fc9899d02401bdb04580af7")
+
+# Download the data and metadata while checking if the URL you have is the latest and if you already downloaded this version of the data
+download_list_dois <- map(dois, ~download_d1_data_pkg(.x, path = "."))
+
+# Read the data and metadata into R
+penguin_datasets <- map(flatten(download_list_dois), read_d1_files) %>% 
+  set_names(dois) # adding  names since the filenames are not explicit
+
+# Combining the data
+penguins_metajam <- penguin_datasets %>% 
+  map_dfr(~.x$data, .id = "provenance") # ideally we will use the DOI
+
+penguins_metajam
